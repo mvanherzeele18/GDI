@@ -1,33 +1,32 @@
 # GDI — Groene Duivels Ingooigem
 
-Een statische club- en ploegmap gebouwd met HTML, CSS, JavaScript en Firebase.
+Statische ploegwebsite gebouwd met HTML, CSS en JavaScript, met Firebase als optionele cloudopslag.
 
-## Publiceren
-1. Open Settings → Pages.
-2. Kies Deploy from a branch.
-3. Selecteer `main` en `/ (root)`.
-4. Sla op. GitHub Pages publiceert de site.
+## Publiceren via GitHub Pages
+1. Open **Settings → Pages** in deze repository.
+2. Kies **Deploy from a branch**.
+3. Selecteer branch `main` en map `/ (root)`.
+4. Klik op **Save**. Open daarna de GitHub Pages-URL van de repository.
 
-## Firebase instellen
+## Firebase
 De Firebase Web App-configuratie staat in `firebase.js`.
-1. Schakel Email/Password in via Firebase Authentication.
-2. Maak een Cloud Firestore database aan.
-3. Publiceer `firestore.rules` via Firestore → Rules.
-4. Voeg bij Firebase Authentication → Settings → Authorized domains je GitHub Pages-domein toe (bijvoorbeeld `mvanherzeele18.github.io`).
+1. Schakel **Email/Password** in bij Firebase Authentication.
+2. Maak een Cloud Firestore-database aan.
+3. Publiceer de inhoud van `firestore.rules` via Firestore → Rules.
+4. Voeg het GitHub Pages-domein toe aan Authentication → Settings → Authorized domains.
 
-## Onderdelen
-- Overzicht met aantallen en eerstvolgende wedstrijd.
-- Spelerslijst met toevoegen, zoeken en verwijderen.
-- Tactiekbord met 4-3-3, 4-2-3-1, 3-5-2, 4-4-2 en 5-3-2, spelers verslepen, tegenstander tonen en opstellingen bewaren/laden.
-- Trainingsvoorbereiding met datum, duur, doel en oefeningen.
-- Wedstrijdplanning met tegenstander, datum, uur, thuis/uit en locatie.
-- Ploegnotities.
-- Firebase e-mail/wachtwoordaccounts en persoonlijke Firestore-gegevens.
-- Lokale opslag als je niet ingelogd bent.
+Zonder login worden gegevens lokaal in de browser bewaard. Met login worden spelers, wedstrijden en tactieken in de eigen gebruikersruimte in Firestore bewaard. Lokale gegevens worden niet automatisch naar een account gekopieerd.
 
-## Belangrijk
-De spelerslijst start leeg: vul de echte selectie zelf in. De website bevat geen officiële clubgegevens, logo-afbeelding, wedstrijdkalender, uitslagen, klassement of contactgegevens tenzij je die zelf toevoegt. De clubstijl gebruikt een eenvoudige GDI-woordmarkering en is geen officieel clublogo.
+## Functionaliteit
+- **Ploeg & spelers:** spelers toevoegen, zoeken en verwijderen; rugnummers worden gecontroleerd op dubbels.
+- **Wedstrijden:** tegenstander, datum, aftrap, thuis/uit, competitie en locatie bewaren.
+- **Wedstrijdselectie:** open een wedstrijd en vink de spelers aan die geselecteerd zijn.
+- **Uitslag:** markeer de wedstrijd als gespeeld en bewaar de doelpunten voor GDI en de tegenstander plus wedstrijdnotities.
+- **Tactiekbord:** twee ploegen, acht formaties, spelers verslepen, pass-, loop-, dribbel-, schot-, lijn- en zonetekeningen, bal plaatsen en PNG-export.
+- **Tactieken:** tactieken bewaren, laden, aanpassen en opnieuw opslaan.
 
-De Firebase-configuratie voor een webapp is geen servergeheim. De veiligheid van ploeggegevens hangt af van Authentication, de Firestore Security Rules en het correct instellen van toegestane domeinen. Test de regels in Firebase Console voordat je echte persoonsgegevens toevoegt.
-
-De app is een praktische basisversie; functies zoals aanwezigheidsregistratie, rollen/rechten voor trainers en spelers, uitnodigingen, pushmeldingen, exports en live competitie-integraties zijn nog niet ingebouwd.
+## Aandachtspunten
+- De selectie start leeg: vul zelf de spelers van je ploeg in.
+- Er worden geen echte wedstrijdkalenders, uitslagen of officiële clubgegevens opgehaald.
+- De Firebase Web API-key is een clientconfiguratie, geen servergeheim. Bescherm data met Authentication en de Firestore-regels.
+- De website is een clubhulpmiddel, geen officiële GDI-clubwebsite. Gebruik het clublogo alleen als je daarvoor toestemming hebt.
