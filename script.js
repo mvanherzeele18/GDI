@@ -41,13 +41,13 @@ function recordMarkup(type,x){
  if(type==="matches") {title="GDI "+(x.venue==="Uit"?"@":"—")+" "+x.opponent;meta=[x.date,x.time,x.venue,x.type].filter(Boolean).join(" · ");body=x.location||""}
  if(type==="tactics")meta="Opstelling: "+(x.formation||"");
  if(type==="notes")meta="Ploegnotitie";
- return '<div class="record"><div class="record-top"><div><b>'+esc(title)+'</b><div class="record-meta">'+esc(meta)+'</div></div><div class="record-actions"><button data-remove="'+esc(x.id)+'" data-type="'+type+'" aria-label="Verwijderen">×</button></div></div>'+(body?'<p>'+esc(body)+'</p>':"")+'</div>';
+ return '<div class="record"><div class="record-top"><div><b>'+esc(title)+'</b><div class="record-meta">'+esc(meta)+'</div></div><div class="record-actions">'+(type==="tactics"?'<button data-load-tactic="'+esc(x.id)+'" aria-label="Opstelling laden">↗</button>':"")+'<button data-remove="'+esc(x.id)+'" data-type="'+type+'" aria-label="Verwijderen">×</button></div></div>'+(body?'<p>'+esc(body)+'</p>':"")+'</div>';
 }
 function renderRecords(type){
  const map={trainings:"#training-list",matches:"#match-list",tactics:"#tactic-list",notes:"#note-list"};
  const arr=[...state[type]].sort((a,b)=>(a.date||"").localeCompare(b.date||"")||((b.createdAt?.seconds||b.createdAt||0)-(a.createdAt?.seconds||a.createdAt||0)));
  $(map[type]).innerHTML=arr.map(x=>recordMarkup(type,x)).join("")||({trainings:"Nog geen trainingen voorbereid.",matches:"Nog geen wedstrijden gepland.",tactics:"Nog geen opstellingen bewaard.",notes:"Nog geen notities bewaard."}[type]);
- $$(map[type]+" [data-remove]").forEach(b=>b.addEventListener("click",()=>removeRecord(b.dataset.type,b.dataset.remove)));
+ $(map[type]+" [data-remove]").forEach(b=>b.addEventListener("click",()=>removeRecord(b.dataset.type,b.dataset.remove)));if(type==="tactics")$(map[type]+" [data-load-tactic]").forEach(b=>b.addEventListener("click",()=>{const item=state.tactics.find(x=>x.id===b.dataset.loadTactic);if(!item)return;currentFormation=item.formation||"4-3-3";$("#formation").value=currentFormation;positions=Array.isArray(item.positions)?item.positions.map(p=>({...p})):formations[currentFormation].map(([x,y],i)=>({number:i+1,x,y}));renderPitch();showPage("tactics");toast("Opstelling geladen.");}));
 }
 function showPage(name){$$(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+name));$$(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===name));$("#current-page").textContent=({home:"Overzicht",team:"Ploeg & spelers",tactics:"Tactiekbord",training:"Trainingen",matches:"Wedstrijden",notes:"Ploegnotities"})[name]||"GDI";if(name==="tactics")renderPitch();window.scrollTo({top:0,behavior:"smooth"})}
 $$("[data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
