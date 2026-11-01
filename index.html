@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a100d">
+  <meta name="description" content="GDI — de gratis werkplek voor voetbalcoaches.">
+  <title>GDI — Football Coach Workspace</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="script.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="GDI home"><span class="brand-mark">G</span><span>GDI<span class="brand-dot">.</span></span></a>
+      <div class="nav-caption">WERKPLEK</div>
+      <nav class="main-nav">
+        <button class="nav-link active" data-page="dashboard"><span class="nav-icon">▦</span>Dashboard</button>
+        <button class="nav-link" data-page="tactics"><span class="nav-icon">⌗</span>Tactiekbord</button>
+        <button class="nav-link" data-page="animations"><span class="nav-icon">↗</span>Animaties</button>
+        <button class="nav-link" data-page="squad"><span class="nav-icon">♧</span>Mijn ploeg</button>
+        <button class="nav-link" data-page="training"><span class="nav-icon">◷</span>Trainingen</button>
+        <button class="nav-link" data-page="matches"><span class="nav-icon">♜</span>Wedstrijden</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="online-dot"></span> GRATIS VOOR ELKE COACH<br><strong>Jouw spel. Jouw ideeën.</strong></div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumbs">GDI <span>/</span> <strong id="breadcrumb">Dashboard</strong></div>
+        <div class="top-actions">
+          <span id="firebase-status" class="connection-status">Demo-modus</span>
+          <button class="button button-quiet" id="auth-open">Inloggen</button>
+          <button class="button button-quiet hidden" id="auth-logout">Uitloggen</button>
+        </div>
+      </header>
+
+      <div class="page-wrap">
+        <section class="page active" id="page-dashboard">
+          <div class="page-heading">
+            <div><div class="eyebrow">GDI COACH PLATFORM</div><h1>Jouw voetbalwerkplek</h1><p class="muted">Alles wat je nodig hebt om jouw team beter te laten voetballen.</p></div>
+            <button class="button button-primary" data-go="tactics">＋ Nieuwe tactiek</button>
+          </div>
+          <div class="stats-grid">
+            <article class="stat-card"><div class="stat-top"><span>Spelers</span><span>♧</span></div><strong id="stat-players">11</strong><small>In jouw selectie</small></article>
+            <article class="stat-card"><div class="stat-top"><span>Tactieken</span><span>⌗</span></div><strong id="stat-tactics">0</strong><small>Bewaarde plannen</small></article>
+            <article class="stat-card"><div class="stat-top"><span>Trainingen</span><span>◷</span></div><strong id="stat-training">0</strong><small>Geplande sessies</small></article>
+            <article class="stat-card"><div class="stat-top"><span>Account</span><span>◉</span></div><strong id="stat-account" class="stat-word">Demo</strong><small>Jouw coachomgeving</small></article>
+          </div>
+          <div class="dashboard-grid">
+            <article class="panel"><div class="panel-heading"><div><h2>Snelle toegang</h2><p class="muted">Ga meteen aan de slag.</p></div></div>
+              <div class="quick-grid">
+                <button class="quick-card" data-go="tactics"><span class="quick-icon">⌗</span><b>Tactiek ontwerpen</b><small>Formaties en posities</small></button>
+                <button class="quick-card" data-go="animations"><span class="quick-icon">↗</span><b>Animaties bekijken</b><small>Bewegingen tonen</small></button>
+                <button class="quick-card" data-go="squad"><span class="quick-icon">♧</span><b>Selectie beheren</b><small>Spelers en nummers</small></button>
+                <button class="quick-card" data-go="training"><span class="quick-icon">◷</span><b>Training plannen</b><small>Oefeningen en timing</small></button>
+              </div>
+            </article>
+            <article class="panel"><div class="panel-heading"><div><h2>Recent werk</h2><p class="muted">Jouw laatst bewaarde items.</p></div></div><div id="recent-list" class="empty-state">Je bewaarde tactieken en trainingen verschijnen hier.</div></article>
+          </div>
+          <div class="free-note">GDI blijft gratis. Geen premium-abonnement en geen betaalmuur.</div>
+        </section>
+
+        <section class="page" id="page-tactics">
+          <div class="page-heading"><div><div class="eyebrow">TACTISCH PLAN</div><h1>Tactiekbord</h1><p class="muted">Sleep spelers naar de juiste positie en stel je formatie samen.</p></div></div>
+          <div class="tactics-layout">
+            <article class="panel pitch-panel">
+              <div class="toolbar"><div><h2>Speelveld</h2><p class="muted">Selecteer en sleep een speler.</p></div><select id="formation-select" class="select-control"><option>4-3-3</option><option>4-2-3-1</option><option>3-5-2</option><option>4-4-2</option></select></div>
+              <div class="pitch" id="pitch" aria-label="Interactief voetbalveld">
+                <div class="pitch-half"></div><div class="pitch-center-circle"></div><div class="pitch-center-spot"></div>
+                <div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div>
+                <div class="pitch-small-box pitch-small-top"></div><div class="pitch-small-box pitch-small-bottom"></div>
+                <div class="pitch-goal pitch-goal-top"></div><div class="pitch-goal pitch-goal-bottom"></div>
+                <div id="players-layer"></div><div id="opponents-layer"></div>
+              </div>
+              <div class="pitch-actions"><button class="button button-quiet" id="toggle-opponents">＋ Tegenstander tonen</button><button class="button button-quiet" id="reset-formation">Reset formatie</button><button class="button button-primary" id="save-tactic">↧ Tactiek bewaren</button></div>
+            </article>
+            <aside class="panel settings-panel"><h2>Bordinstellingen</h2><p class="muted">Kies een basisformatie.</p><div class="formation-list" id="formation-buttons"></div><div class="selected-info" id="selected-info">Geen speler geselecteerd.</div><div class="saved-block"><h3>Bewaarde tactieken</h3><div id="tactics-list" class="saved-list empty-state">Nog geen tactieken bewaard.</div></div></aside>
+          </div>
+        </section>
+
+        <section class="page" id="page-animations">
+          <div class="page-heading"><div><div class="eyebrow">BEWEGING & LOOPACTIES</div><h1>Animaties</h1><p class="muted">Toon een eenvoudige bewegingsdemo met je opstelling.</p></div></div>
+          <article class="panel animation-panel"><div class="toolbar"><div><h2>Animatievoorbeeld</h2><p class="muted">Een eenvoudige preview van spelersbeweging.</p></div><span class="phase-label" id="phase-label">Fase 1 / 6</span></div><div class="pitch animation-pitch" id="animation-pitch"><div class="pitch-half"></div><div class="pitch-center-circle"></div><div class="pitch-center-spot"></div><div class="pitch-box pitch-box-top"></div><div class="pitch-box pitch-box-bottom"></div><div id="animation-layer"></div></div><div class="pitch-actions"><button class="button button-primary" id="animation-play">▶ Afspelen</button><button class="button button-quiet" id="animation-reset">Opnieuw</button></div><p class="muted">Dit is een basisanimatie. Een uitgebreide tijdlijneditor kan later worden toegevoegd.</p></article>
+        </section>
+
+        <section class="page" id="page-squad">
+          <div class="page-heading"><div><div class="eyebrow">TEAMBEHEER</div><h1>Mijn ploeg</h1><p class="muted">Beheer de spelers en rugnummers van jouw selectie.</p></div></div>
+          <article class="panel"><div class="panel-heading"><div><h2>Spelersselectie <span class="count-pill" id="squad-count">11</span></h2><p class="muted">Voeg spelers toe of verwijder ze uit je lijst.</p></div></div>
+            <div class="table-head"><span>Speler</span><span>Nummer</span><span>Positie</span><span></span></div><div id="squad-list" class="squad-list"></div>
+            <form id="add-player-form" class="add-player-form"><input id="player-name" class="input-control" placeholder="Naam speler" required maxlength="40"><input id="player-number" class="input-control number-input" type="number" min="1" max="99" value="12" required><select id="player-position" class="select-control"><option>Keeper</option><option>Verdediger</option><option selected>Middenvelder</option><option>Aanvaller</option></select><button class="button button-primary" type="submit">＋ Toevoegen</button></form>
+          </article>
+        </section>
+
+        <section class="page" id="page-training">
+          <div class="page-heading"><div><div class="eyebrow">TRAININGSPLANNING</div><h1>Trainingen</h1><p class="muted">Werk een training uit en bewaar je coachingideeën.</p></div></div>
+          <div class="training-layout">
+            <article class="panel"><h2>Nieuwe training</h2><p class="muted">Noteer het doel en de inhoud van je sessie.</p><form id="training-form" class="stack-form"><label>Naam van de training<input class="input-control" id="training-title" placeholder="Bijv. Positiespel en omschakeling" required maxlength="80"></label><label>Omschrijving<textarea class="input-control textarea-control" id="training-description" rows="5" placeholder="Doel, oefeningen, coachingpunten..."></textarea></label><label>Trainingsduur<select class="select-control" id="training-duration"><option>60 minuten</option><option>75 minuten</option><option selected>90 minuten</option><option>105 minuten</option><option>120 minuten</option></select></label><button class="button button-primary" type="submit">↧ Training bewaren</button></form></article>
+            <article class="panel"><div class="panel-heading"><div><h2>Bewaarde trainingen</h2><p class="muted">Jouw trainingsbibliotheek.</p></div></div><div id="training-list" class="saved-list empty-state">Nog geen trainingen bewaard.</div></article>
+          </div>
+        </section>
+
+        <section class="page" id="page-matches">
+          <div class="page-heading"><div><div class="eyebrow">MATCHDAY</div><h1>Wedstrijden</h1><p class="muted">Bereid je volgende wedstrijd tactisch voor.</p></div></div>
+          <article class="panel match-placeholder"><div class="match-symbol">♜</div><h2>Wedstrijdvoorbereiding</h2><p class="muted">Maak een basisopstelling, bewaar verschillende tactische plannen en bespreek de aanpak met je team.</p><button class="button button-primary" data-go="tactics">Open tactiekbord</button><p class="muted small-note">Een wedstrijdkalender, live-statistieken en wedstrijdrapporten zijn nog niet ingebouwd.</p></article>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="modal panel"><div class="modal-heading"><div><div class="eyebrow">JOUW COACHACCOUNT</div><h2 id="auth-title">Inloggen bij GDI</h2></div><button class="icon-button" id="auth-close" aria-label="Sluiten">×</button></div><p class="muted">Maak een account of log in om je tactieken en trainingen via Firebase te bewaren.</p><form id="auth-form" class="stack-form"><label>E-mailadres<input class="input-control" id="auth-email" type="email" autocomplete="email" required></label><label>Wachtwoord<input class="input-control" id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label><p id="auth-error" class="error-text"></p><div class="modal-actions"><button class="button button-primary" type="submit" data-auth-mode="login">Inloggen</button><button class="button button-quiet" type="button" id="signup-button">Account maken</button></div></form></div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
