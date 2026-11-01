@@ -1,131 +1,93 @@
 import { auth, db, firebaseReady } from "./firebase.js";
-import {
-  createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut
-} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => [...document.querySelectorAll(selector)];
-const defaultPlayers = [
-  {id:1,number:1,x:50,y:91},{id:2,number:2,x:82,y:76},{id:3,number:4,x:61,y:78},{id:4,number:5,x:39,y:78},{id:5,number:3,x:18,y:76},
-  {id:6,number:6,x:50,y:59},{id:7,number:8,x:68,y:46},{id:8,number:10,x:32,y:46},{id:9,number:7,x:82,y:25},{id:10,number:9,x:50,y:20},{id:11,number:11,x:18,y:25}
-];
-const formations = {
-  "4-3-3":[[50,91],[82,76],[61,78],[39,78],[18,76],[50,59],[68,46],[32,46],[82,25],[50,20],[18,25]],
-  "4-2-3-1":[[50,91],[82,76],[61,78],[39,78],[18,76],[62,61],[38,61],[80,39],[50,35],[20,39],[50,17]],
-  "3-5-2":[[50,91],[72,77],[50,80],[28,77],[90,52],[70,56],[50,60],[30,56],[10,52],[62,25],[38,25]],
-  "4-4-2":[[50,91],[82,76],[61,78],[39,78],[18,76],[82,51],[61,51],[39,51],[18,51],[62,25],[38,25]]
-};
-let players = structuredClone(defaultPlayers);
-let squad = [
-  ["Doelman",1,"Keeper"],["Rechtsback",2,"Verdediger"],["Centrale verdediger",4,"Verdediger"],["Centrale verdediger",5,"Verdediger"],["Linksback",3,"Verdediger"],
-  ["Middenvelder",6,"Middenvelder"],["Middenvelder",8,"Middenvelder"],["Middenvelder",10,"Middenvelder"],["Rechtsbuiten",7,"Aanvaller"],["Spits",9,"Aanvaller"],["Linksbuiten",11,"Aanvaller"]
-].map(([name,number,position])=>({name,number,position}));
-let selectedPlayer = null, draggedPlayer = null, showOpponents = false, opponentNodes = [], currentUser = null;
-let tactics = [], trainings = [], animationTimer = null, animationPhase = 0;
-
-function toast(message){const el=$("#toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2800);}
-function escapeHTML(value){return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));}
-function showPage(name){
-  $$(".page").forEach(page=>page.classList.toggle("active",page.id===`page-${name}`));
-  $$(".nav-link").forEach(button=>button.classList.toggle("active",button.dataset.page===name));
-  const active=$(`[data-page="${name}"]`);$("#breadcrumb").textContent=active?.textContent.trim()||name;
-  if(name==="tactics")renderPitch();if(name==="animations")renderAnimation();window.scrollTo({top:0,behavior:"smooth"});
+import { createUserWithEmailAndPassword,onAuthStateChanged,signInWithEmailAndPassword,signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { addDoc,collection,deleteDoc,doc,onSnapshot,orderBy,query,serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const KEYS=["players","trainings","matches","tactics","notes"];
+const state={players:[],trainings:[],matches:[],tactics:[],notes:[]};
+let user=null,opponents=false,dragging=null,positions=[],unsubs=[],selected=null;
+const formations={"4-3-3":[[50,91],[82,76],[61,78],[39,78],[18,76],[50,59],[68,46],[32,46],[82,25],[50,20],[18,25]],"4-2-3-1":[[50,91],[82,76],[61,78],[39,78],[18,76],[62,61],[38,61],[80,39],[50,35],[20,39],[50,17]],"3-5-2":[[50,91],[72,77],[50,80],[28,77],[90,52],[70,56],[50,60],[30,56],[10,52],[62,25],[38,25]],"4-4-2":[[50,91],[82,76],[61,78],[39,78],[18,76],[82,51],[61,51],[39,51],[18,51],[62,25],[38,25]],"5-3-2":[[50,91],[88,75],[68,78],[50,80],[32,78],[12,75],[70,49],[50,53],[30,49],[62,24],[38,24]]};
+const initialPlayers=[["Doelman",1,"Keeper"],["Rechtsback",2,"Verdediger"],["Centrale verdediger",4,"Verdediger"],["Centrale verdediger",5,"Verdediger"],["Linksback",3,"Verdediger"],["Middenvelder",6,"Middenvelder"],["Middenvelder",8,"Middenvelder"],["Middenvelder",10,"Middenvelder"],["Rechtsbuiten",7,"Aanvaller"],["Spits",9,"Aanvaller"],["Linksbuiten",11,"Aanvaller"]];
+const uid=()=>crypto.randomUUID();
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg){const e=$("#toast");e.textContent=msg;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),2600)}
+function localLoad(){KEYS.forEach(k=>{try{state[k]=JSON.parse(localStorage.getItem("gdi_"+k)||"[]")}catch{state[k]=[]}})}
+function localSave(k){localStorage.setItem("gdi_"+k,JSON.stringify(state[k]))}
+function renderAll(){renderStats();renderPlayers();renderRecords("trainings");renderRecords("matches");renderRecords("tactics");renderRecords("notes");renderHome()}
+async function addRecord(type,data){
+ const item={id:uid(),...data,createdAt:Date.now()};
+ if(user&&db){try{await addDoc(collection(db,"users",user.uid,type),{...data,createdAt:serverTimestamp()});toast("Opgeslagen in je GDI-account.");return}catch(e){console.error(e);toast("Opslaan in de cloud lukte niet. Je gegevens zijn niet aangepast.");return}}
+ state[type].unshift(item);localSave(type);renderAll();toast("Opgeslagen op dit toestel. Log in om te synchroniseren.");
 }
-$$("[data-page]").forEach(button=>button.addEventListener("click",()=>showPage(button.dataset.page)));
-$$("[data-go]").forEach(button=>button.addEventListener("click",()=>showPage(button.dataset.go)));
-
+async function removeRecord(type,id){
+ if(user&&db){try{await deleteDoc(doc(db,"users",user.uid,type,id));toast("Verwijderd.");return}catch(e){console.error(e);toast("Verwijderen lukte niet.");return}}
+ state[type]=state[type].filter(x=>x.id!==id);localSave(type);renderAll();toast("Verwijderd.");
+}
+function renderStats(){$("#count-players").textContent=state.players.length;$("#count-training").textContent=state.trainings.length;$("#count-matches").textContent=state.matches.length;$("#count-tactics").textContent=state.tactics.length;$("#squad-total").textContent=state.players.length}
+function renderHome(){
+ const next=[...state.matches].filter(x=>x.date).sort((a,b)=>a.date.localeCompare(b.date)).find(x=>x.date>=new Date().toISOString().slice(0,10));
+ $("#next-event").innerHTML=next?'<div class="record"><div class="match-date">'+esc(next.date)+(next.time?' · '+esc(next.time):'')+'</div><b>GDI '+(next.venue==="Uit"?'@':'—')+' '+esc(next.opponent)+'</b><p>'+esc(next.venue)+' · '+esc(next.location||next.type||"Wedstrijd")+'</p></div>':"Nog geen komende wedstrijd ingepland.";
+ const recent=[...state.trainings.map(x=>({...x,kind:"Training"})),...state.matches.map(x=>({...x,kind:"Wedstrijd"})),...state.tactics.map(x=>({...x,kind:"Tactiek"})),...state.notes.map(x=>({...x,kind:"Notitie"}))].sort((a,b)=>(b.createdAt?.seconds?b.createdAt.seconds*1000:b.createdAt||0)-(a.createdAt?.seconds?a.createdAt.seconds*1000:a.createdAt||0)).slice(0,4);
+ $("#recent-items").innerHTML=recent.map(x=>'<div class="record"><div class="record-top"><b>'+esc(x.title||x.opponent)+'</b><span class="subtle">'+esc(x.kind)+'</span></div></div>').join("")||"Nog niets bewaard. Je recente ploegwerk komt hier te staan.";
+}
+function renderPlayers(){
+ const term=($("#player-search")?.value||"").toLowerCase();
+ const rows=state.players.filter(p=>(p.name+" "+p.number+" "+p.position).toLowerCase().includes(term));
+ $("#squad-list").innerHTML=rows.map(p=>'<div class="player-row"><span class="player-name">'+esc(p.name)+'</span><span class="player-number">#'+esc(p.number)+'</span><span class="player-position">'+esc(p.position)+'</span><button class="delete" data-del-player="'+esc(p.id)+'" aria-label="Verwijder speler">×</button></div>').join("")||'<div class="empty">Geen spelers gevonden. Voeg een speler toe aan je lijst.</div>';
+ $$("[data-del-player]").forEach(b=>b.addEventListener("click",()=>removeRecord("players",b.dataset.delPlayer)));
+}
+function recordMarkup(type,x){
+ let title=x.title||x.opponent||"Item",meta="",body=x.description||x.body||"";
+ if(type==="trainings")meta=[x.date,x.duration,x.goal].filter(Boolean).join(" · ");
+ if(type==="matches") {title="GDI "+(x.venue==="Uit"?"@":"—")+" "+x.opponent;meta=[x.date,x.time,x.venue,x.type].filter(Boolean).join(" · ");body=x.location||""}
+ if(type==="tactics")meta="Opstelling: "+(x.formation||"");
+ if(type==="notes")meta="Ploegnotitie";
+ return '<div class="record"><div class="record-top"><div><b>'+esc(title)+'</b><div class="record-meta">'+esc(meta)+'</div></div><div class="record-actions"><button data-remove="'+esc(x.id)+'" data-type="'+type+'" aria-label="Verwijderen">×</button></div></div>'+(body?'<p>'+esc(body)+'</p>':"")+'</div>';
+}
+function renderRecords(type){
+ const map={trainings:"#training-list",matches:"#match-list",tactics:"#tactic-list",notes:"#note-list"};
+ const arr=[...state[type]].sort((a,b)=>(a.date||"").localeCompare(b.date||"")||((b.createdAt?.seconds||b.createdAt||0)-(a.createdAt?.seconds||a.createdAt||0)));
+ $(map[type]).innerHTML=arr.map(x=>recordMarkup(type,x)).join("")||({trainings:"Nog geen trainingen voorbereid.",matches:"Nog geen wedstrijden gepland.",tactics:"Nog geen opstellingen bewaard.",notes:"Nog geen notities bewaard."}[type]);
+ $$(map[type]+" [data-remove]").forEach(b=>b.addEventListener("click",()=>removeRecord(b.dataset.type,b.dataset.remove)));
+}
+function showPage(name){$$(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+name));$$(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===name));$("#current-page").textContent=({home:"Overzicht",team:"Ploeg & spelers",tactics:"Tactiekbord",training:"Trainingen",matches:"Wedstrijden",notes:"Ploegnotities"})[name]||"GDI";if(name==="tactics")renderPitch();window.scrollTo({top:0,behavior:"smooth"})}
+$$("[data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
+$$("[data-go]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.go)));
+$("#add-player-focus").addEventListener("click",()=>{$("#player-name").focus();window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"})});
+$("#player-search").addEventListener("input",renderPlayers);
+$("#player-form").addEventListener("submit",e=>{e.preventDefault();const name=$("#player-name").value.trim(),number=Number($("#player-number").value),position=$("#player-position").value;if(!name||number<1||number>99)return;if(state.players.some(p=>Number(p.number)===number)){toast("Dit rugnummer is al in gebruik.");return}addRecord("players",{name,number,position});e.target.reset();});
+$("#training-form").addEventListener("submit",e=>{e.preventDefault();addRecord("trainings",{title:$("#training-title").value.trim(),date:$("#training-date").value,duration:$("#training-duration").value,goal:$("#training-goal").value.trim(),description:$("#training-description").value.trim()});e.target.reset()});
+$("#match-form").addEventListener("submit",e=>{e.preventDefault();addRecord("matches",{opponent:$("#opponent-name").value.trim(),date:$("#match-date").value,time:$("#match-time").value,venue:$("#match-venue").value,type:$("#match-type").value.trim(),location:$("#match-location").value.trim()});e.target.reset()});
+$("#note-form").addEventListener("submit",e=>{e.preventDefault();addRecord("notes",{title:$("#note-title").value.trim(),body:$("#note-body").value.trim()});e.target.reset()});
+let currentFormation="4-3-3";
 function renderPitch(){
-  const layer=$("#players-layer");layer.innerHTML="";
-  players.forEach(player=>{
-    const token=document.createElement("div");token.className="player-token"+(selectedPlayer===player.id?" selected":"");token.textContent=player.number;
-    token.style.left=player.x+"%";token.style.top=player.y+"%";token.dataset.playerId=player.id;
-    token.addEventListener("pointerdown",event=>{event.preventDefault();draggedPlayer=player.id;selectedPlayer=player.id;token.setPointerCapture(event.pointerId);renderPitch();$("#selected-info").textContent=`Speler #${player.number} geselecteerd. Sleep hem over het veld.`;});
-    token.addEventListener("pointermove",event=>{if(draggedPlayer!==player.id)return;const rect=$("#pitch").getBoundingClientRect();player.x=Math.max(4,Math.min(96,(event.clientX-rect.left)/rect.width*100));player.y=Math.max(5,Math.min(95,(event.clientY-rect.top)/rect.height*100));token.style.left=player.x+"%";token.style.top=player.y+"%";});
-    token.addEventListener("pointerup",()=>{draggedPlayer=null;renderPitch();});token.addEventListener("pointercancel",()=>{draggedPlayer=null;renderPitch();});layer.append(token);
-  });
-  renderOpponents();
+ const layer=$("#pitch-players");layer.innerHTML="";
+ if(positions.length!==11)positions=formations[currentFormation].map(([x,y],i)=>({number:i+1,x,y}));
+ positions.forEach((p,i)=>{const el=document.createElement("div");el.className="shirt";el.textContent=p.number;el.style.left=p.x+"%";el.style.top=p.y+"%";el.addEventListener("pointerdown",e=>{dragging=i;selected=i;el.classList.add("selected");el.setPointerCapture(e.pointerId)});el.addEventListener("pointermove",e=>{if(dragging!==i)return;const r=$("#pitch").getBoundingClientRect();p.x=Math.max(4,Math.min(96,(e.clientX-r.left)/r.width*100));p.y=Math.max(5,Math.min(95,(e.clientY-r.top)/r.height*100));el.style.left=p.x+"%";el.style.top=p.y+"%"});el.addEventListener("pointerup",()=>{dragging=null;renderPitch()});el.addEventListener("pointercancel",()=>{dragging=null;renderPitch()});layer.append(el)});
+ if(opponents){[[50,9],[18,24],[39,24],[61,24],[82,24],[28,44],[50,44],[72,44],[18,65],[50,65],[82,65]].forEach(([x,y],i)=>{const el=document.createElement("div");el.className="shirt opponent";el.textContent=i+1;el.style.left=x+"%";el.style.top=y+"%";layer.append(el)})}
 }
-function renderOpponents(){
-  const layer=$("#opponents-layer");layer.innerHTML="";if(!showOpponents)return;
-  const positions=[[50,9],[18,24],[39,24],[61,24],[82,24],[28,44],[50,44],[72,44],[18,65],[50,65],[82,65]];
-  positions.forEach(([x,y],i)=>{const el=document.createElement("div");el.className="player-token opponent";el.textContent=i+1;el.style.left=x+"%";el.style.top=y+"%";layer.append(el);});
-}
-function setFormation(name){players=players.map((player,index)=>({...player,x:formations[name][index][0],y:formations[name][index][1]}));$("#formation-select").value=name;renderPitch();renderFormationButtons();}
-function renderFormationButtons(){$("#formation-buttons").innerHTML=Object.keys(formations).map(name=>`<button class="button formation-button ${$("#formation-select").value===name?"chosen":""}" data-formation="${name}">${name}</button>`).join("");$$("[data-formation]").forEach(button=>button.addEventListener("click",()=>setFormation(button.dataset.formation)));}
-$("#formation-select").addEventListener("change",event=>setFormation(event.target.value));
-$("#toggle-opponents").addEventListener("click",()=>{showOpponents=!showOpponents;$("#toggle-opponents").textContent=showOpponents?"− Tegenstander verbergen":"＋ Tegenstander tonen";renderOpponents();});
-$("#reset-formation").addEventListener("click",()=>{setFormation("4-3-3");selectedPlayer=null;$("#selected-info").textContent="Geen speler geselecteerd.";});
-$("#save-tactic").addEventListener("click",()=>saveItem("tactics",`Tactiek ${$("#formation-select").value}`,JSON.stringify({formation:$("#formation-select").value,players})));
+$("#formation").addEventListener("change",e=>{currentFormation=e.target.value;positions=formations[currentFormation].map(([x,y],i)=>({number:i+1,x,y}));renderPitch()});
+$("#reset-pitch").addEventListener("click",()=>{positions=formations[currentFormation].map(([x,y],i)=>({number:i+1,x,y}));renderPitch()});
+$("#opponents").addEventListener("click",()=>{opponents=!opponents;$("#opponents").textContent=opponents?"Tegenstander verbergen":"Tegenstander tonen";renderPitch()});
+$("#save-tactic").addEventListener("click",()=>{const title=$("#tactic-name").value.trim()||"Opstelling "+currentFormation;addRecord("tactics",{title,formation:currentFormation,positions:positions.map(p=>({...p}))})});
 
-function renderSquad(){
-  $("#squad-count").textContent=squad.length;$("#stat-players").textContent=squad.length;
-  $("#squad-list").innerHTML=squad.map((player,index)=>`<div class="squad-row"><span>${escapeHTML(player.name)}</span><span>#${player.number}</span><span class="position-label">${escapeHTML(player.position)}</span><button class="delete-button" data-remove-player="${index}" aria-label="Verwijder ${escapeHTML(player.name)}">×</button></div>`).join("")||'<div class="empty-state">Nog geen spelers. Voeg je eerste speler toe.</div>';
-  $$("[data-remove-player]").forEach(button=>button.addEventListener("click",()=>{squad.splice(Number(button.dataset.removePlayer),1);renderSquad();}));
-}
-$("#add-player-form").addEventListener("submit",event=>{event.preventDefault();const name=$("#player-name").value.trim(),number=Number($("#player-number").value);if(!name||number<1||number>99)return;if(squad.some(p=>p.number===number)){toast("Dat rugnummer is al in gebruik.");return;}squad.push({name,number,position:$("#player-position").value});$("#player-name").value="";$("#player-number").value=String(number+1);renderSquad();toast("Speler toegevoegd.");});
-
-async function saveItem(type,title,description){
-  const item={id:crypto.randomUUID(),title,description,createdAt:Date.now()};
-  if(currentUser&&db){try{await addDoc(collection(db,"users",currentUser.uid,type),{title,description,createdAt:serverTimestamp()});toast("Bewaard in Firebase.");return;}catch(error){console.error(error);toast("Opslaan in Firebase is mislukt.");return;}}
-  const list=type==="tactics"?tactics:trainings;list.unshift(item);renderSaved();toast("Bewaard in deze browsersessie. Log in voor cloudsynchronisatie.");
-}
-async function deleteItem(type,id){
-  if(currentUser&&db){try{await deleteDoc(doc(db,"users",currentUser.uid,type,id));return;}catch(error){console.error(error);toast("Verwijderen is mislukt.");return;}}
-  if(type==="tactics")tactics=tactics.filter(item=>item.id!==id);else trainings=trainings.filter(item=>item.id!==id);renderSaved();
-}
-function renderSaved(){
-  $("#stat-tactics").textContent=tactics.length;$("#stat-training").textContent=trainings.length;
-  $("#tactics-list").classList.toggle("empty-state",!tactics.length);
-  $("#tactics-list").innerHTML=tactics.map(item=>savedMarkup(item,"tactics")).join("")||"Nog geen tactieken bewaard.";
-  $("#training-list").classList.toggle("empty-state",!trainings.length);
-  $("#training-list").innerHTML=trainings.map(item=>savedMarkup(item,"trainings")).join("")||"Nog geen trainingen bewaard.";
-  const recent=[...tactics.map(x=>({...x,kind:"Tactiek"})),...trainings.map(x=>({...x,kind:"Training"}))].slice(0,6);
-  $("#recent-list").innerHTML=recent.map(item=>`<div class="recent-item"><div><b>${escapeHTML(item.title)}</b><small>${item.kind}</small></div></div>`).join("")||"Je bewaarde tactieken en trainingen verschijnen hier.";
-  $$("[data-delete-item]").forEach(button=>button.addEventListener("click",()=>deleteItem(button.dataset.type,button.dataset.deleteItem)));
-}
-function savedMarkup(item,type){return `<div class="saved-item"><div><b>${escapeHTML(item.title)}</b><small>${escapeHTML(item.description||"")}</small></div><button class="saved-delete" data-delete-item="${item.id}" data-type="${type}" aria-label="Verwijderen">×</button></div>`;}
-$("#training-form").addEventListener("submit",event=>{event.preventDefault();const title=$("#training-title").value.trim();if(!title)return;saveItem("sessions",title,($("#training-description").value.trim()+" · "+$("#training-duration").value).trim());$("#training-form").reset();$("#training-duration").value="90 minuten";});
-
-function renderAnimation(){
-  const layer=$("#animation-layer");layer.innerHTML="";
-  players.forEach((player,index)=>{const el=document.createElement("div");el.className="player-token";el.textContent=player.number;const offset=animationTimer?Math.sin((animationPhase+index)*.7)*7:0;const vertical=animationTimer?Math.cos((animationPhase+index)*.7)*5:0;el.style.left=(player.x+offset)+"%";el.style.top=(player.y+vertical)+"%";layer.append(el);});
-  $("#phase-label").textContent=`Fase ${animationPhase+1} / 6`;
-}
-function stopAnimation(){if(animationTimer)clearInterval(animationTimer);animationTimer=null;$("#animation-play").textContent="▶ Afspelen";renderAnimation();}
-$("#animation-play").addEventListener("click",()=>{if(animationTimer){stopAnimation();return;}$("#animation-play").textContent="Ⅱ Pauzeren";animationTimer=setInterval(()=>{animationPhase=(animationPhase+1)%6;renderAnimation();},650);});
-$("#animation-reset").addEventListener("click",()=>{stopAnimation();animationPhase=0;renderAnimation();});
-
-$("#auth-open").addEventListener("click",()=>{$("#auth-modal").classList.remove("hidden");$("#auth-error").textContent="";});
+$("#login-open").addEventListener("click",()=>{$("#auth-modal").classList.remove("hidden");$("#auth-error").textContent=""});
 $("#auth-close").addEventListener("click",()=>$("#auth-modal").classList.add("hidden"));
-$("#auth-modal").addEventListener("click",event=>{if(event.target.id==="auth-modal")$("#auth-modal").classList.add("hidden");});
-$("#auth-form").addEventListener("submit",event=>{event.preventDefault();authenticate("login");});
-$("#signup-button").addEventListener("click",()=>authenticate("signup"));
-async function authenticate(mode){
-  $("#auth-error").textContent="";
-  if(!firebaseReady||!auth){$("#auth-error").textContent="Vul eerst je Firebase-configuratie in firebase.js in.";return;}
-  const email=$("#auth-email").value,password=$("#auth-password").value;
-  try{if(mode==="signup")await createUserWithEmailAndPassword(auth,email,password);else await signInWithEmailAndPassword(auth,email,password);$("#auth-modal").classList.add("hidden");toast("Je bent ingelogd.");}
-  catch(error){$("#auth-error").textContent=error.message||"Inloggen is niet gelukt.";}
+$("#auth-modal").addEventListener("click",e=>{if(e.target.id==="auth-modal")$("#auth-modal").classList.add("hidden")});
+$("#auth-form").addEventListener("submit",e=>{e.preventDefault();authenticate(false)});
+$("#signup").addEventListener("click",()=>authenticate(true));
+async function authenticate(create){
+ $("#auth-error").textContent="";
+ if(!firebaseReady||!auth){$("#auth-error").textContent="Firebase is nog niet geconfigureerd.";return}
+ try{const email=$("#auth-email").value,password=$("#auth-password").value;if(create)await createUserWithEmailAndPassword(auth,email,password);else await signInWithEmailAndPassword(auth,email,password);$("#auth-modal").classList.add("hidden");toast("Je bent ingelogd bij GDI.")}
+ catch(e){$("#auth-error").textContent=e.code==="auth/email-already-in-use"?"Dit e-mailadres heeft al een account.":e.code==="auth/invalid-credential"?"E-mailadres of wachtwoord klopt niet.":e.message}
 }
-$("#auth-logout").addEventListener("click",()=>signOut(auth));
-
-function setAccount(user){
-  currentUser=user;$("#auth-open").classList.toggle("hidden",!!user);$("#auth-logout").classList.toggle("hidden",!user);
-  $("#stat-account").textContent=user?"Actief":"Demo";
-  $("#firebase-status").textContent=user?"Firebase verbonden":(firebaseReady?"Firebase klaar · niet ingelogd":"Demo-modus");
-  $("#firebase-status").classList.toggle("ready",!!user);
-  if(!user){tactics=[];trainings=[];renderSaved();}
+$("#logout").addEventListener("click",()=>signOut(auth));
+function subscribeUser(u){
+ unsubs.forEach(fn=>fn());unsubs=[];
+ if(!u){localLoad();renderAll();return}
+ KEYS.forEach(type=>{const unsub=onSnapshot(query(collection(db,"users",u.uid,type),orderBy("createdAt","desc")),snap=>{state[type]=snap.docs.map(d=>({id:d.id,...d.data()}));renderAll()},err=>{console.error(err);toast("Kon "+type+" niet synchroniseren. Controleer de Firestore-regels.")});unsubs.push(unsub)});
 }
-if(firebaseReady&&auth){
-  onAuthStateChanged(auth,user=>{
-    setAccount(user);
-    if(!user)return;
-    onSnapshot(query(collection(db,"users",user.uid,"tactics"),orderBy("createdAt","desc")),snapshot=>{tactics=snapshot.docs.map(d=>({id:d.id,...d.data()}));renderSaved();});
-    onSnapshot(query(collection(db,"users",user.uid,"sessions"),orderBy("createdAt","desc")),snapshot=>{trainings=snapshot.docs.map(d=>({id:d.id,...d.data()}));renderSaved();});
-  });
-}else setAccount(null);
-
-renderFormationButtons();renderPitch();renderSquad();renderSaved();
+function setUser(u){user=u;$("#login-open").classList.toggle("hidden",!!u);$("#logout").classList.toggle("hidden",!u);$("#sync-state").textContent=u?"Verbonden met Firebase":firebaseReady?"Niet ingelogd · lokaal":"Lokale modus";$("#sync-state").style.color=u?"#1f6b43":"";subscribeUser(u)}
+localLoad();
+if(firebaseReady&&auth)onAuthStateChanged(auth,setUser);else{setUser(null)}
+renderAll();positions=formations[currentFormation].map(([x,y],i)=>({number:i+1,x,y}));renderPitch();
